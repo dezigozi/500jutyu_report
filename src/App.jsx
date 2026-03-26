@@ -343,7 +343,7 @@ const App = () => {
       {/* ===== Sidebar ===== */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col p-6 sticky top-0 h-screen shadow-2xl z-20 no-print flex-shrink-0">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="bg-blue-500 p-2 rounded-xl text-white shadow-lg shadow-blue-500/20">
+          <div className="bg-red-500 p-2 rounded-xl text-white shadow-lg shadow-red-500/20">
             <Database size={24} />
           </div>
           <h1 className="text-lg font-black leading-none tracking-tighter uppercase">
@@ -356,7 +356,7 @@ const App = () => {
             onClick={() => setViewMode('dashboard')}
             className={`flex items-center gap-3 w-full p-4 rounded-2xl transition-all duration-300 ${
               viewMode === 'dashboard'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-600/30 scale-105'
                 : 'text-slate-400 hover:bg-slate-800'
             }`}
           >
@@ -367,7 +367,7 @@ const App = () => {
             onClick={() => setViewMode('pivot_report')}
             className={`flex items-center gap-3 w-full p-4 rounded-2xl transition-all duration-300 ${
               viewMode === 'pivot_report'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-600/30 scale-105'
                 : 'text-slate-400 hover:bg-slate-800'
             }`}
           >
@@ -433,7 +433,7 @@ const App = () => {
             <div>
               <div className="flex items-center gap-4 mb-2">
                 <h2 className="text-4xl font-black text-slate-800 tracking-tighter">
-                  特販部リース会社実績レポート
+                  架装品 500受注レポート
                 </h2>
                 <ConnectionBadge status={connectionStatus} />
               </div>
@@ -445,7 +445,7 @@ const App = () => {
             <button
               onClick={handleRefresh}
               disabled={isLoading}
-              className={`group flex items-center gap-2 px-8 py-4 rounded-3xl bg-slate-900 text-white font-black text-sm shadow-2xl hover:bg-blue-600 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
+              className={`group flex items-center gap-2 px-8 py-4 rounded-3xl bg-slate-900 text-white font-black text-sm shadow-2xl hover:bg-red-600 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
                 isLoading ? 'animate-pulse' : ''
               }`}
             >
@@ -468,7 +468,7 @@ const App = () => {
                   onClick={() => setSelectedLeaseCo('ALL')}
                   className={`px-6 py-2.5 rounded-2xl text-xs font-black transition-all duration-300 ${
                     selectedLeaseCo === 'ALL'
-                      ? 'bg-blue-600 text-white shadow-xl shadow-blue-200'
+                      ? 'bg-red-600 text-white shadow-xl shadow-red-200'
                       : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                   }`}
                 >
@@ -480,7 +480,7 @@ const App = () => {
                     onClick={() => setSelectedLeaseCo(l)}
                     className={`px-6 py-2.5 rounded-2xl text-xs font-black transition-all duration-300 ${
                       selectedLeaseCo === l
-                        ? 'bg-blue-600 text-white shadow-xl shadow-blue-200'
+                        ? 'bg-red-600 text-white shadow-xl shadow-red-200'
                         : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                     }`}
                   >
@@ -667,7 +667,7 @@ const ConnectionBadge = ({ status }) => {
   const styles = {
     idle: 'bg-slate-100 text-slate-500 border-slate-200',
     loading: 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse',
-    online: 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse-glow',
+    online: 'bg-red-50 text-red-600 border-red-100 animate-pulse-glow',
     offline: 'bg-rose-50 text-rose-600 border-rose-100',
   };
   const labels = {
@@ -695,8 +695,8 @@ const LoadingScreen = () => (
   <div className="flex flex-col items-center justify-center h-96 animate-fade-in">
     <div className="relative mb-8">
       <div className="w-20 h-20 border-4 border-slate-200 rounded-full" />
-      <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      <Database className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" size={28} />
+      <div className="absolute top-0 left-0 w-20 h-20 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
+      <Database className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-red-500" size={28} />
     </div>
     <h3 className="text-xl font-black text-slate-700 mb-2">データを読み込んでいます</h3>
     <p className="text-sm text-slate-400 font-bold">ネットワークフォルダからExcelファイルを解析中...</p>
@@ -704,7 +704,7 @@ const LoadingScreen = () => (
       {[0, 1, 2].map(i => (
         <div
           key={i}
-          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+          className="w-2 h-2 bg-red-500 rounded-full animate-bounce"
           style={{ animationDelay: `${i * 0.15}s` }}
         />
       ))}
@@ -765,7 +765,7 @@ const DashboardView = ({
       <button
         onClick={() => onBreadcrumb('branch')}
         className={`flex items-center gap-1 transition-colors ${
-          !activeView.branchName ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+          !activeView.branchName ? 'text-red-600' : 'text-slate-400 hover:text-slate-600'
         }`}
       >
         <Building2 size={16} /> 部店一覧
@@ -776,7 +776,7 @@ const DashboardView = ({
           <button
             onClick={() => onBreadcrumb('second')}
             className={`flex items-center gap-1 transition-colors ${
-              !activeView.secondName ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+              !activeView.secondName ? 'text-red-600' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             {hierarchyOrder === 'orderer_first' ? <Store size={16} /> : <User size={16} />} {activeView.branchName}
@@ -786,7 +786,7 @@ const DashboardView = ({
       {activeView.secondName && (
         <>
           <ChevronRight size={14} className="text-slate-300" />
-          <span className="text-blue-600 flex items-center gap-1">
+          <span className="text-red-600 flex items-center gap-1">
             {hierarchyOrder === 'orderer_first' ? <User size={16} /> : <Store size={16} />} {activeView.secondName}
           </span>
         </>
@@ -798,13 +798,13 @@ const DashboardView = ({
       <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1">
         <button
           onClick={() => onHierarchyOrderChange('orderer_first')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black ${hierarchyOrder === 'orderer_first' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black ${hierarchyOrder === 'orderer_first' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}
         >
           <Store size={14} /> 部署→担当者→顧客
         </button>
         <button
           onClick={() => onHierarchyOrderChange('customer_first')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black ${hierarchyOrder === 'customer_first' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black ${hierarchyOrder === 'customer_first' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}
         >
           <User size={14} /> 部署→顧客→担当者
         </button>
@@ -829,9 +829,9 @@ const DashboardView = ({
     <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
       <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
         <h3 className="font-black text-slate-800 text-xl flex items-center gap-3">
-          <LevelIcon className="text-blue-500" />
+          <LevelIcon className="text-red-500" />
           {levelInfo.title}
-          {selectedLeaseCo !== 'ALL' && <span className="text-blue-500 text-base">— {selectedLeaseCo}</span>}
+          {selectedLeaseCo !== 'ALL' && <span className="text-red-500 text-base">— {selectedLeaseCo}</span>}
         </h3>
         <div className="flex items-center gap-4">
           <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
@@ -841,7 +841,7 @@ const DashboardView = ({
         <div className="flex gap-2 no-print">
           <button
             onClick={onSavePdf}
-            className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 hover:text-blue-500 hover:border-blue-200 transition-all shadow-sm text-sm font-bold"
+            className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 hover:text-red-500 hover:border-red-200 transition-all shadow-sm text-sm font-bold"
           >
             <FileText size={16} /> PDF
           </button>
@@ -875,7 +875,7 @@ const DashboardView = ({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {totalRow && (
-              <tr className="bg-blue-50/50 border-b-2 border-blue-200">
+              <tr className="bg-red-50/50 border-b-2 border-red-200">
                 <td className="px-2 py-5 w-12 text-center">—</td>
                 <td className="px-8 py-5">
                   <div className="font-black text-blue-700 text-lg">{totalRow.name}</div>
@@ -887,10 +887,10 @@ const DashboardView = ({
                   const prevYear = years[yIdx - 1];
                   const yoy = prevYear ? calcYoY(sales, totalRow.sales[prevYear]) : null;
                   return (
-                    <td key={year} className="px-6 py-5 border-l border-blue-200">
+                    <td key={year} className="px-6 py-5 border-l border-red-200">
                       <div className="space-y-3">
                         <div className="flex justify-between items-baseline">
-                          <span className="text-xs font-black text-blue-500">売上</span>
+                          <span className="text-xs font-black text-red-500">売上</span>
                           <div className="text-right">
                             <div className="font-mono font-black text-blue-800">{fmtAmt(sales)}</div>
                             {yoy !== null && (
@@ -903,7 +903,7 @@ const DashboardView = ({
                         </div>
                         {showProfit && (
                           <div className="flex justify-between items-baseline">
-                            <span className="text-xs font-black text-blue-500">粗利(率)</span>
+                            <span className="text-xs font-black text-red-500">粗利(率)</span>
                             <div className="text-right">
                               <div className="font-mono font-black text-emerald-600">{fmtAmt(profit)}</div>
                               <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px] font-black mt-0.5 w-fit ml-auto border border-emerald-100">{margin}%</div>
@@ -926,7 +926,7 @@ const DashboardView = ({
               data.map((item, idx) => (
                 <tr
                   key={idx}
-                  className={`group hover:bg-blue-50/30 transition-all ${
+                  className={`group hover:bg-red-50/30 transition-all ${
                     !isLeafLevel ? 'cursor-pointer' : ''
                   }`}
                   onClick={() => !isLeafLevel && onDrillDown(item)}
@@ -938,7 +938,7 @@ const DashboardView = ({
                     <button
                       type="button"
                       onClick={() => toggleCheck(item.name)}
-                      className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-blue-600 transition-colors print:pointer-events-none"
+                      className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-red-600 transition-colors print:pointer-events-none"
                       title={checkedItems.has(item.name) ? 'チェック解除' : '合計に含める'}
                     >
                       {checkedItems.has(item.name) ? (
@@ -949,7 +949,7 @@ const DashboardView = ({
                     </button>
                   </td>
                   <td className="px-8 py-6">
-                    <div className="font-black text-slate-800 text-lg group-hover:text-blue-600 transition-colors flex items-center gap-2">
+                    <div className="font-black text-slate-800 text-lg group-hover:text-red-600 transition-colors flex items-center gap-2">
                       {item.name}
                       {!isLeafLevel && (
                         <ChevronRight
@@ -958,6 +958,11 @@ const DashboardView = ({
                         />
                       )}
                     </div>
+                    {item.reps && item.reps.length > 0 && (
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {item.reps.join(' / ')}
+                      </div>
+                    )}
                     {!isLeafLevel && (
                       <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter no-print">
                         クリックで詳細を表示
@@ -1019,7 +1024,7 @@ const DashboardView = ({
     {chartData.length > 0 && (
       <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 no-print">
         <h4 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
-          <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
+          <div className="w-1.5 h-6 bg-red-500 rounded-full" />
           売上トレンド可視化
         </h4>
         <div className="h-72 w-full">
@@ -1070,7 +1075,7 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
             onClick={() => onBranchChange('ALL')}
             className={`px-6 py-2.5 rounded-2xl text-xs font-black transition-all duration-300 ${
               pivotBranch === 'ALL'
-                ? 'bg-blue-600 text-white shadow-xl shadow-blue-200'
+                ? 'bg-red-600 text-white shadow-xl shadow-red-200'
                 : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
             }`}
           >
@@ -1082,7 +1087,7 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
               onClick={() => onBranchChange(b)}
               className={`px-6 py-2.5 rounded-2xl text-xs font-black transition-all duration-300 ${
                 pivotBranch === b
-                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-200'
+                  ? 'bg-red-600 text-white shadow-xl shadow-red-200'
                   : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
               }`}
             >
@@ -1096,15 +1101,15 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
     <div className="bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
       <div className="p-8 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-100">
+          <div className="p-2 bg-red-600 text-white rounded-xl shadow-lg shadow-red-100">
             <ListFilter size={20} />
           </div>
           <div>
             <h3 className="font-black text-slate-800 text-xl tracking-tighter">
               一括網羅ピボットレポート
-              {titleSuffix && <span className="text-blue-500 ml-2 text-base">— {titleSuffix}</span>}
+              {titleSuffix && <span className="text-red-500 ml-2 text-base">— {titleSuffix}</span>}
             </h3>
-            <p className="text-[10px] font-bold text-blue-500 mt-0.5 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-red-500 mt-0.5 uppercase tracking-widest italic">
               Unified Comprehensive View for PDF &middot; {data.length} records
               {amountUnit === 'thousand' && <span className="ml-2 text-amber-500 normal-case">（単位：千円）</span>}
             </p>
@@ -1118,7 +1123,7 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
           <div className="flex gap-2 no-print">
             <button
               onClick={onSavePdf}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 hover:text-blue-500 hover:border-blue-200 transition-all shadow-sm text-sm font-bold"
+              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 hover:text-red-500 hover:border-red-200 transition-all shadow-sm text-sm font-bold"
             >
               <FileText size={16} /> PDF
             </button>
@@ -1162,13 +1167,13 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
               </tr>
             ) : (
               data.map((row, idx) => (
-                <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
+                <tr key={idx} className="hover:bg-red-50/50 transition-colors">
                   <td className="px-4 py-3 border-r border-slate-300 sticky left-0 bg-white z-10 font-black text-slate-800 text-sm">
                     {row.orderer}
                   </td>
                   <td className="px-4 py-3 border-r border-slate-300">
                     <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                      <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
                       <span className="font-black text-slate-800 text-sm">{row.customer}</span>
                     </div>
                   </td>
@@ -1248,14 +1253,14 @@ const SettingsModal = ({ networkPath, onPathChange, onSelectFolder, onClose, onS
       <div className="p-10 space-y-8">
         <div className="space-y-3">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 ml-1">
-            <FolderOpen size={14} className="text-blue-500" /> Excelデータ保存先パス (UNC)
+            <FolderOpen size={14} className="text-red-500" /> Excelデータ保存先パス (UNC)
           </label>
           <div className="flex gap-2">
             <input
               type="text"
               value={networkPath}
               onChange={e => onPathChange(e.target.value)}
-              className="flex-1 bg-slate-100 border-none rounded-[1.5rem] p-5 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-blue-500/10 transition-all"
+              className="flex-1 bg-slate-100 border-none rounded-[1.5rem] p-5 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-red-500/10 transition-all"
               placeholder="\\192.1.1.103\share\..."
             />
             <button
@@ -1271,8 +1276,8 @@ const SettingsModal = ({ networkPath, onPathChange, onSelectFolder, onClose, onS
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-4">
-          <div className="p-5 bg-blue-50 rounded-3xl border border-blue-100">
-            <div className="w-8 h-8 bg-blue-600 text-white rounded-xl flex items-center justify-center mb-3 shadow-md shadow-blue-200">
+          <div className="p-5 bg-red-50 rounded-3xl border border-red-100">
+            <div className="w-8 h-8 bg-red-600 text-white rounded-xl flex items-center justify-center mb-3 shadow-md shadow-red-200">
               <CheckCircle2 size={16} />
             </div>
             <h4 className="text-xs font-black text-blue-900 mb-1 tracking-tight">自動データ同期</h4>
@@ -1295,7 +1300,7 @@ const SettingsModal = ({ networkPath, onPathChange, onSelectFolder, onClose, onS
       <div className="p-10 pt-0">
         <button
           onClick={onSave}
-          className="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-black shadow-2xl shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-blue-600"
+          className="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-black shadow-2xl shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-red-600"
         >
           <RefreshCcw size={18} />
           設定を保存して再読込

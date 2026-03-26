@@ -106,15 +106,19 @@ export function aggregateByCustomerInBranch(rows, years, branchName) {
   filtered.forEach(row => {
     const key = row.customerName || '(未分類)';
     if (!map[key]) {
-      map[key] = { name: key, sales: {}, profit: {} };
+      map[key] = { name: key, sales: {}, profit: {}, repsSet: new Set() };
       years.forEach(y => { map[key].sales[y] = 0; map[key].profit[y] = 0; });
     }
     if (row.fiscalYear && years.includes(row.fiscalYear)) {
       map[key].sales[row.fiscalYear] += row.sales;
       map[key].profit[row.fiscalYear] += row.profit;
     }
+    if (row.ordererName) map[key].repsSet.add(row.ordererName);
   });
-  return Object.values(map).sort((a, b) => {
+  return Object.values(map).map(item => {
+    const { repsSet, ...rest } = item;
+    return { ...rest, reps: [...repsSet].filter(Boolean) };
+  }).sort((a, b) => {
     const latestYear = years[years.length - 1];
     return (b.sales[latestYear] || 0) - (a.sales[latestYear] || 0);
   });

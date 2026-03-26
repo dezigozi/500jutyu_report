@@ -120,7 +120,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    title: '特販部リース会社実績レポート',
+    title: '架装品 500受注レポート',
     show: false,
   });
   const isDev = process.argv.includes('--dev');
@@ -162,10 +162,10 @@ function getExcelFiles(dirPath) {
 const HEADER_PATTERNS = {
   leaseCompany: { patterns: ['略称', 'リース会社', 'リース', '架装実績'], prefer_last: false },
   branch:       { patterns: ['部店', '部店名', '支店'], prefer_last: true },
-  ordererName:  { patterns: ['得意先名', '注文社名', '注文者名', '注文者', '注文先'], prefer_last: false },
+  ordererName:  { patterns: ['得意先担当者', '担当者名', '注文社名', '注文者名'], prefer_last: false },
   customerName: { patterns: ['顧客名_漢', '顧客名_漢字', '顧客名', '顧客'], prefer_last: false },
-  repLastName:  { patterns: ['得意先担当者', '担当者名', '担当者', '担当'], prefer_last: false },
-  salesAmount:  { patterns: ['税抜合計', '金額', '売上金額', '売上'], prefer_last: false },
+  repLastName:  { patterns: ['得意先名', '担当者', '担当'], prefer_last: false },
+  salesAmount:  { patterns: ['単価'], prefer_last: false },
   unitPrice:    { patterns: ['単価'], prefer_last: false },
   costPrice:    { patterns: ['原価'], prefer_last: false },
   quantity:     { patterns: ['受注数量', '数量'], prefer_last: false },
@@ -258,6 +258,8 @@ function toStr(val) {
   if (val === null || val === undefined) return '';
   if (typeof val === 'object' && val.richText) return val.richText.map(r => r.text).join('');
   if (typeof val === 'object' && val.result !== undefined) return String(val.result);
+  if (typeof val === 'object' && val.text !== undefined) return String(val.text).trim();
+  if (typeof val === 'object') return '';
   return String(val).trim();
 }
 
