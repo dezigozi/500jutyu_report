@@ -7,6 +7,7 @@
     "start": "electron .",
     "dev": "concurrently \"npx webpack serve --mode development\" \"wait-on http://localhost:9000 && electron . --dev\"",
     "build:renderer": "npx webpack --mode production",
+    "shortcut:dev": "node create-dev-shortcut.js",
     "build": "npm run build:renderer && electron-builder",
     "pack": "electron-builder --dir"
   },
@@ -26,6 +27,7 @@
     "html-webpack-plugin": "^5.6.0",
     "postcss": "^8.4.35",
     "postcss-loader": "^8.1.1",
+    "rcedit": "^5.0.2",
     "sharp": "^0.34.5",
     "style-loader": "^3.3.4",
     "tailwindcss": "^3.4.1",
@@ -46,8 +48,8 @@
     "xlsx-populate": "^1.21.0"
   },
   "build": {
-    "appId": "com.company.lease-report",
-    "productName": "特販部リース実績レポート",
+    "appId": "com.company.lease-report-500",
+    "productName": "500受注レポート",
     "directories": {
       "output": "dist"
     },

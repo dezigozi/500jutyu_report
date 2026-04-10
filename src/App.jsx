@@ -7,12 +7,15 @@ import {
   ArrowUpRight, ArrowDownRight, LayoutDashboard, Database,
   Calendar, FolderOpen, RefreshCcw, CheckCircle2, FileText, FileSpreadsheet,
   ListFilter, AlertCircle, Loader2, XCircle, ChevronLeft, ArrowUpDown, Eye, EyeOff,
-  CheckSquare, Square,
+  CheckSquare, Square, Package,
 } from 'lucide-react';
 import {
   filterRows, aggregateByBranch, aggregateByOrderer, aggregateByCustomer,
   aggregateByCustomerInBranch, aggregateByOrdererForCustomer,
-  generatePivotData, calcYoY, calcMargin, formatCurrency, formatCurrencyFull,
+  aggregateByBranchByMonth, aggregateByOrdererByMonth, aggregateByCustomerByMonth,
+  aggregateByCustomerInBranchByMonth, aggregateByOrdererForCustomerByMonth,
+  aggregateByProductByMonth,
+  generatePivotData, generatePivotDataByMonth, calcYoY, calcMargin, formatCurrency, formatCurrencyFull,
   generateCsvContent,
 } from './utils/aggregator';
 
@@ -21,6 +24,28 @@ const api = window.electronAPI || null;
 
 // デフォルトパス
 const DEFAULT_PATH = '\\\\192.1.1.103\\share\\特販共有\\見積\\500データ';
+
+/** 表示幅: 全角相当=1、ASCII・半角カナ等=0.5（全角15文字分まで） */
+function charDisplayUnit(ch) {
+  const c = ch.codePointAt(0);
+  if (c <= 0x007e) return 0.5;
+  if (c >= 0xff61 && c <= 0xff9f) return 0.5;
+  if (c >= 0xffe8 && c <= 0xffee) return 0.5;
+  return 1;
+}
+
+function truncateByDisplayWidth(str, maxUnits) {
+  if (!str) return '';
+  let units = 0;
+  let out = '';
+  for (const ch of str) {
+    const u = charDisplayUnit(ch);
+    if (units + u > maxUnits) break;
+    out += ch;
+    units += u;
+  }
+  return out;
+}
 
 const App = () => {
   // ===== State =====
@@ -40,7 +65,7 @@ const App = () => {
   const [showProfit, setShowProfit] = useState(true);
   const [hierarchyOrder, setHierarchyOrder] = useState('orderer_first'); // 'orderer_first' | 'customer_first'
   const [checkedItems, setCheckedItems] = useState(new Set()); // チェックで選択された項目（合計に反映）
-  const [activeView, setActiveView] = useState({ branchName: null, secondName: null }); // branchName必須、secondNameは担当者or顧客
+  const [activeView, setActiveView] = useState({ branchName: null, secondName: null, thirdName: null }); // branchName必須、secondName担当者or顧客、thirdName顧客or担当者
 
   const printRef = useRef(null);
 
@@ -102,9 +127,15 @@ const App = () => {
       const customers = ['(株)西原環境', '山下商事(有)', '日本カーソリューションズ', 'トヨタモビリティパーツ', '(株)丸紅エネルギー', '三菱商事(株)', 'アイシン精機(株)', '(株)豊田自動織機'];
       const reps = ['土岐 暁治', '犬塚 龍', '山本 太郎', '佐藤 花子', '田中 一郎'];
 
+      // 直近3ヶ月のデータを生成
+      const today = new Date();
+      const last3 = [];
+      for (let i = 2; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        last3.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+      }
       for (let i = 0; i < 500; i++) {
-        const fy = years[Math.floor(Math.random() * years.length)];
-        const month = Math.floor(Math.random() * 12) + 1;
+        const ymEntry = last3[Math.floor(Math.random() * last3.length)];
         const sales = Math.floor(Math.random() * 500000) + 50000;
         const profitRate = 0.15 + Math.random() * 0.2;
         mockRows.push({
@@ -115,8 +146,9 @@ const App = () => {
           rep: reps[Math.floor(Math.random() * reps.length)],
           sales,
           profit: Math.floor(sales * profitRate),
-          fiscalYear: fy,
-          month,
+          fiscalYear: ymEntry.month >= 4 ? ymEntry.year : ymEntry.year - 1,
+          month: ymEntry.month,
+          calendarYear: ymEntry.year,
           sourceFile: 'mock_data.xlsx',
         });
       }
@@ -138,23 +170,35 @@ const App = () => {
     loadData();
   }, []);
 
-  // データ読み込み後に最新月をデフォルト終了月に設定（会計年度順: 4→...→12→1→2→3）
+  // 直近3ヶ月を計算する関数
+  const getLast3Months = useCallback(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1; // 1-12
+
+    // 3ヶ月前から今月までを計算
+    const months = [];
+    for (let i = 2; i >= 0; i--) {
+      let m = month - i;
+      if (m <= 0) m += 12;
+      months.push(m);
+    }
+    return months;
+  }, []);
+
+  // データ読み込み後に直近3ヶ月を自動設定
   useEffect(() => {
     if (!rawData || !rawData.rows.length) return;
-    const maxFY = Math.max(...rawData.years);
-    const latestMonths = rawData.rows
-      .filter(r => r.fiscalYear === maxFY)
-      .map(r => r.month);
-    if (latestMonths.length > 0) {
-      const toFiscalPos = m => (m - 4 + 12) % 12;
-      const latest = latestMonths.reduce((best, m) => toFiscalPos(m) > toFiscalPos(best) ? m : best);
-      setMonthRange({ start: '4', end: String(latest) });
-    }
-  }, [rawData]);
+    const last3Months = getLast3Months();
+    setMonthRange({
+      start: String(last3Months[0]),
+      end: String(last3Months[last3Months.length - 1])
+    });
+  }, [rawData, getLast3Months]);
 
-  // 階層順の変更時は secondName のみリセット（部署は選択しっぱなし）
+  // 階層順の変更時は secondName・thirdName をリセット（部署は選択しっぱなし）
   useEffect(() => {
-    setActiveView(prev => ({ ...prev, secondName: null }));
+    setActiveView(prev => ({ ...prev, secondName: null, thirdName: null }));
   }, [hierarchyOrder]);
 
   // テーブルデータ変更時（ドリルダウン時など）にチェックを全選択に初期化
@@ -166,7 +210,12 @@ const App = () => {
   // ===== フィルタ済みデータ =====
   const filteredRows = useMemo(() => {
     if (!rawData) return [];
-    return filterRows(rawData.rows, {
+    let rows = rawData.rows;
+
+    // 「空白」と「その他」を除外
+    rows = rows.filter(r => r.leaseCompany && r.leaseCompany.trim() && r.leaseCompany !== '空白' && r.leaseCompany !== 'その他');
+
+    return filterRows(rows, {
       leaseCompany: selectedLeaseCo,
       startMonth: monthRange.start,
       endMonth: monthRange.end,
@@ -174,7 +223,12 @@ const App = () => {
   }, [rawData, selectedLeaseCo, monthRange]);
 
   const years = useMemo(() => rawData?.years || [], [rawData]);
-  const leaseCompanies = useMemo(() => rawData?.leaseCompanies || [], [rawData]);
+
+  // リース会社フィルタ：「空白」と「その他」を除外
+  const leaseCompanies = useMemo(() => {
+    if (!rawData?.leaseCompanies) return [];
+    return rawData.leaseCompanies.filter(lc => lc && lc.trim() && lc !== '空白' && lc !== 'その他');
+  }, [rawData]);
 
   const branches = useMemo(() => {
     if (!filteredRows.length) return [];
@@ -183,83 +237,105 @@ const App = () => {
     return [...set].sort();
   }, [filteredRows]);
 
-  // ===== ドリルダウンデータ（階層順に応じて集計） =====
+  // 月別集計用の月リスト生成（年またぎ対応）
+  const months = useMemo(() => {
+    const today = new Date();
+    const monthKeys = [];
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      monthKeys.push(`${d.getFullYear()}年${d.getMonth() + 1}月`);
+    }
+    monthKeys.push('計');
+    return monthKeys;
+  }, []);
+
+  // ===== ドリルダウンデータ（月別集計） =====
   const currentTableData = useMemo(() => {
-    if (!filteredRows.length || !years.length) return [];
-    const { branchName, secondName } = activeView;
-    if (!branchName) return aggregateByBranch(filteredRows, years);
+    if (!filteredRows.length) return [];
+    const { branchName, secondName, thirdName } = activeView;
+    const monthList = months.slice(0, -1); // 計を除いた月リスト
+
+    if (!branchName) return aggregateByBranchByMonth(filteredRows, monthList);
     if (hierarchyOrder === 'orderer_first') {
-      if (!secondName) return aggregateByOrderer(filteredRows, years, branchName);
-      return aggregateByCustomer(filteredRows, years, branchName, secondName);
+      if (!secondName) return aggregateByOrdererByMonth(filteredRows, monthList, branchName);
+      if (!thirdName) return aggregateByCustomerByMonth(filteredRows, monthList, branchName, secondName);
+      return aggregateByProductByMonth(filteredRows, monthList, branchName, secondName, thirdName, 'orderer_first');
     }
     // customer_first
-    if (!secondName) return aggregateByCustomerInBranch(filteredRows, years, branchName);
-    return aggregateByOrdererForCustomer(filteredRows, years, branchName, secondName);
-  }, [filteredRows, years, activeView, hierarchyOrder]);
+    if (!secondName) return aggregateByCustomerInBranchByMonth(filteredRows, monthList, branchName);
+    if (!thirdName) return aggregateByOrdererForCustomerByMonth(filteredRows, monthList, branchName, secondName);
+    return aggregateByProductByMonth(filteredRows, monthList, branchName, secondName, thirdName, 'customer_first');
+  }, [filteredRows, activeView, hierarchyOrder, months]);
 
-  // ===== ピボットデータ =====
+  // ===== ピボットデータ（月別） =====
   const pivotData = useMemo(() => {
-    if (!filteredRows.length || !years.length) return [];
+    if (!filteredRows.length || !months.length) return [];
     const rows = pivotBranch === 'ALL'
       ? filteredRows
       : filteredRows.filter(r => r.branch === pivotBranch);
-    const data = generatePivotData(rows, years);
-    const latestYear = years[years.length - 1];
+    const monthList = months.slice(0, -1); // 計を除いた月リスト
+    const data = generatePivotDataByMonth(rows, monthList);
+    const latestMonth = monthList[monthList.length - 1];
 
     if (pivotSort === 'sales') {
-      data.sort((a, b) => (b.sales[latestYear] || 0) - (a.sales[latestYear] || 0));
+      data.sort((a, b) => (b.sales[latestMonth] || 0) - (a.sales[latestMonth] || 0));
     } else if (pivotSort === 'orderer') {
       const ordererTotals = {};
       data.forEach(r => {
         const key = r.orderer || '';
-        ordererTotals[key] = (ordererTotals[key] || 0) + (r.sales[latestYear] || 0);
+        ordererTotals[key] = (ordererTotals[key] || 0) + (r.sales[latestMonth] || 0);
       });
       data.sort((a, b) => (ordererTotals[b.orderer || ''] || 0) - (ordererTotals[a.orderer || ''] || 0)
-        || (b.sales[latestYear] || 0) - (a.sales[latestYear] || 0));
+        || (b.sales[latestMonth] || 0) - (a.sales[latestMonth] || 0));
     } else if (pivotSort === 'customer') {
-      data.sort((a, b) => (b.sales[latestYear] || 0) - (a.sales[latestYear] || 0));
+      data.sort((a, b) => (b.sales[latestMonth] || 0) - (a.sales[latestMonth] || 0));
       const customerTotals = {};
       data.forEach(r => {
         const key = r.customer || '';
-        customerTotals[key] = (customerTotals[key] || 0) + (r.sales[latestYear] || 0);
+        customerTotals[key] = (customerTotals[key] || 0) + (r.sales[latestMonth] || 0);
       });
       data.sort((a, b) => (customerTotals[b.customer || ''] || 0) - (customerTotals[a.customer || ''] || 0));
     }
     return data;
-  }, [filteredRows, years, pivotBranch, pivotSort]);
+  }, [filteredRows, months, pivotBranch, pivotSort]);
 
   // ===== チャートデータ =====
   const chartData = useMemo(() => {
-    if (!currentTableData.length || !years.length) return [];
-    const latestYear = years[years.length - 1];
+    if (!currentTableData.length || !months.length) return [];
+    const latestMonthKey = months[months.length - 2]; // 計の前（最新月）
     return currentTableData.slice(0, 8).map(item => ({
       name: item.name.length > 10 ? item.name.slice(0, 10) + '…' : item.name,
       fullName: item.name,
-      [`${latestYear}年 売上`]: item.sales[latestYear] || 0,
-      [`${latestYear}年 粗利`]: item.profit[latestYear] || 0,
+      [`${latestMonthKey} 売上`]: item.sales[latestMonthKey] || 0,
+      [`${latestMonthKey} 粗利`]: item.profit[latestMonthKey] || 0,
     }));
-  }, [currentTableData, years]);
+  }, [currentTableData, months]);
 
   // ===== ハンドラ =====
   const isLeafLevel = useMemo(() => {
-    const { branchName, secondName } = activeView;
-    return !!branchName && !!secondName; // 第3階層はドリル不可
+    const { branchName, secondName, thirdName } = activeView;
+    return !!branchName && !!secondName && !!thirdName; // 第4階層（品番）はドリル不可
   }, [activeView]);
 
   const handleDrillDown = (item) => {
     if (isLeafLevel) return;
-    if (!activeView.branchName) {
-      setActiveView({ branchName: item.name, secondName: null });
+    const { branchName, secondName } = activeView;
+    if (!branchName) {
+      setActiveView({ branchName: item.name, secondName: null, thirdName: null });
+    } else if (!secondName) {
+      setActiveView({ branchName, secondName: item.name, thirdName: null });
     } else {
-      setActiveView({ ...activeView, secondName: item.name });
+      setActiveView({ branchName, secondName, thirdName: item.name });
     }
   };
 
   const handleBreadcrumb = (target) => {
     if (target === 'branch') {
-      setActiveView({ branchName: null, secondName: null });
+      setActiveView({ branchName: null, secondName: null, thirdName: null });
+    } else if (target === 'second') {
+      setActiveView(prev => ({ ...prev, secondName: null, thirdName: null }));
     } else {
-      setActiveView(prev => ({ ...prev, secondName: null }));
+      setActiveView(prev => ({ ...prev, thirdName: null }));
     }
   };
 
@@ -325,15 +401,17 @@ const App = () => {
 
   // ===== レンダリング =====
   const levelInfo = useMemo(() => {
-    const { branchName, secondName } = activeView;
+    const { branchName, secondName, thirdName } = activeView;
     if (!branchName) return { icon: Building2, label: '部店名', title: '部店別 年次実績比較' };
     if (hierarchyOrder === 'orderer_first') {
       if (!secondName) return { icon: Store, label: '注文者名', title: `${branchName} 内 注文者実績` };
-      return { icon: User, label: '顧客名', title: `${secondName} 内 顧客実績` };
+      if (!thirdName) return { icon: User, label: '顧客名', title: `${secondName} 内 顧客実績` };
+      return { icon: Package, label: '品番', title: `${thirdName} 内 品番実績` };
     }
     // customer_first
     if (!secondName) return { icon: User, label: '顧客名', title: `${branchName} 内 顧客実績` };
-    return { icon: Store, label: '注文者名', title: `${secondName} 内 担当者一覧` };
+    if (!thirdName) return { icon: Store, label: '注文者名', title: `${secondName} 内 担当者一覧` };
+    return { icon: Package, label: '品番', title: `${thirdName} 内 品番実績` };
   }, [activeView, hierarchyOrder]);
 
   const LevelIcon = levelInfo.icon;
@@ -492,33 +570,6 @@ const App = () => {
 
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-                期間指定
-              </label>
-              <div className="flex items-center gap-4 bg-slate-100 p-2 rounded-2xl">
-                <select
-                  value={monthRange.start}
-                  onChange={e => setMonthRange(prev => ({ ...prev, start: e.target.value }))}
-                  className="bg-transparent border-none text-sm font-black px-4 py-1.5 focus:ring-0 text-slate-700 cursor-pointer"
-                >
-                  {[...Array(12)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>{i + 1}月</option>
-                  ))}
-                </select>
-                <div className="w-4 h-0.5 bg-slate-300 rounded-full" />
-                <select
-                  value={monthRange.end}
-                  onChange={e => setMonthRange(prev => ({ ...prev, end: e.target.value }))}
-                  className="bg-transparent border-none text-sm font-black px-4 py-1.5 focus:ring-0 text-slate-700 cursor-pointer"
-                >
-                  {[...Array(12)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>{i + 1}月</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
                 金額単位
               </label>
               <div className="flex bg-slate-100 p-1 rounded-2xl">
@@ -608,7 +659,7 @@ const App = () => {
               <DashboardView
                 data={currentTableData}
                 chartData={chartData}
-                years={years}
+                months={months}
                 activeView={activeView}
                 hierarchyOrder={hierarchyOrder}
                 onHierarchyOrderChange={setHierarchyOrder}
@@ -630,7 +681,7 @@ const App = () => {
             ) : (
               <PivotView
                 data={pivotData}
-                years={years}
+                months={months}
                 branches={branches}
                 pivotBranch={pivotBranch}
                 onBranchChange={setPivotBranch}
@@ -714,32 +765,37 @@ const LoadingScreen = () => (
 
 // ===== ダッシュボードビュー =====
 const DashboardView = ({
-  data, chartData, years, activeView, hierarchyOrder, onHierarchyOrderChange,
+  data, chartData, months, activeView, hierarchyOrder, onHierarchyOrderChange,
   levelInfo, LevelIcon, isLeafLevel,
   checkedItems, onCheckedChange,
   onDrillDown, onBreadcrumb, onSavePdf, onSaveCsv,
   fmtAmt, fmtAmtShort, amountUnit, showProfit, selectedLeaseCo,
 }) => {
   const totalRow = useMemo(() => {
-    if (!data.length || !years.length) return null;
+    if (!data.length || !months.length) return null;
     const filtered = data.filter(item => checkedItems.has(item.name));
     if (filtered.length === 0) return null;
     const sales = {};
     const profit = {};
-    years.forEach(y => { sales[y] = 0; profit[y] = 0; });
+    const count = {};
+    const quantity = {};
+    months.forEach(m => { sales[m] = 0; profit[m] = 0; count[m] = 0; quantity[m] = 0; });
     filtered.forEach(item => {
-      years.forEach(y => {
-        sales[y] += item.sales[y] || 0;
-        profit[y] += item.profit[y] || 0;
+      months.forEach(m => {
+        sales[m] += item.sales[m] || 0;
+        profit[m] += item.profit[m] || 0;
+        count[m] += item.count ? (item.count[m] || 0) : 0;
+        quantity[m] += item.quantity ? (item.quantity[m] || 0) : 0;
       });
     });
-    const { branchName, secondName } = activeView;
+    const { branchName, secondName, thirdName } = activeView;
     let label = '合計';
     if (!branchName) label = '全部店 合計';
     else if (!secondName) label = `${branchName} 合計`;
-    else label = `${secondName} 合計`;
-    return { name: label, sales, profit };
-  }, [data, years, activeView, checkedItems]);
+    else if (!thirdName) label = `${secondName} 合計`;
+    else label = `${thirdName} 合計`;
+    return { name: label, sales, profit, count, quantity };
+  }, [data, months, activeView, checkedItems]);
 
   const toggleCheck = useCallback((name) => {
     onCheckedChange(prev => {
@@ -786,8 +842,21 @@ const DashboardView = ({
       {activeView.secondName && (
         <>
           <ChevronRight size={14} className="text-slate-300" />
-          <span className="text-red-600 flex items-center gap-1">
+          <button
+            onClick={() => onBreadcrumb('third')}
+            className={`flex items-center gap-1 transition-colors ${
+              !activeView.thirdName ? 'text-red-600' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
             {hierarchyOrder === 'orderer_first' ? <User size={16} /> : <Store size={16} />} {activeView.secondName}
+          </button>
+        </>
+      )}
+      {activeView.thirdName && (
+        <>
+          <ChevronRight size={14} className="text-slate-300" />
+          <span className="text-red-600 flex items-center gap-1">
+            <Package size={16} /> {activeView.thirdName}
           </span>
         </>
       )}
@@ -866,9 +935,9 @@ const DashboardView = ({
                 {levelInfo.label}
                 {amountUnit === 'thousand' && <span className="ml-2 text-amber-400 normal-case tracking-normal text-xs">（単位：千円）</span>}
               </th>
-              {years.map(year => (
-                <th key={year} className="px-6 py-4 text-center border-l border-slate-800">
-                  {year}年度
+              {months.map(month => (
+                <th key={month} className="px-6 py-4 text-center border-l border-slate-800">
+                  {month}
                 </th>
               ))}
             </tr>
@@ -880,14 +949,28 @@ const DashboardView = ({
                 <td className="px-8 py-5">
                   <div className="font-black text-blue-700 text-lg">{totalRow.name}</div>
                 </td>
-                {years.map((year, yIdx) => {
-                  const sales = totalRow.sales[year] || 0;
-                  const profit = totalRow.profit[year] || 0;
+                {months.map((month, mIdx) => {
+                  // 「計」列の場合は月ごとの合計を計算
+                  let sales, profit, count, qty;
+                  if (month === '計') {
+                    sales = 0; profit = 0; count = 0; qty = 0;
+                    months.slice(0, -1).forEach(m => {
+                      sales += totalRow.sales[m] || 0;
+                      profit += totalRow.profit[m] || 0;
+                      count += totalRow.count ? (totalRow.count[m] || 0) : 0;
+                      qty += totalRow.quantity ? (totalRow.quantity[m] || 0) : 0;
+                    });
+                  } else {
+                    sales = totalRow.sales[month] || 0;
+                    profit = totalRow.profit[month] || 0;
+                    count = totalRow.count ? (totalRow.count[month] || 0) : 0;
+                    qty = totalRow.quantity ? (totalRow.quantity[month] || 0) : 0;
+                  }
                   const margin = calcMargin(profit, sales);
-                  const prevYear = years[yIdx - 1];
-                  const yoy = prevYear ? calcYoY(sales, totalRow.sales[prevYear]) : null;
+                  const prevMonth = months[mIdx - 1];
+                  const yoy = prevMonth && month !== '計' ? calcYoY(sales, totalRow.sales[prevMonth]) : null;
                   return (
-                    <td key={year} className="px-6 py-5 border-l border-red-200">
+                    <td key={month} className="px-6 py-5 border-l border-red-200">
                       <div className="space-y-3">
                         <div className="flex justify-between items-baseline">
                           <span className="text-xs font-black text-red-500">売上</span>
@@ -906,7 +989,14 @@ const DashboardView = ({
                             <span className="text-xs font-black text-red-500">粗利(率)</span>
                             <div className="text-right">
                               <div className="font-mono font-black text-emerald-600">{fmtAmt(profit)}</div>
-                              <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px] font-black mt-0.5 w-fit ml-auto border border-emerald-100">{margin}%</div>
+                              <div className="flex items-center justify-end gap-1 mt-0.5">
+                                {isLeafLevel ? (
+                                  qty > 0 && <span className="text-xs font-black text-slate-800">{qty.toLocaleString()}台</span>
+                                ) : (
+                                  count > 0 && <span className="text-xs font-black text-slate-800">{count.toLocaleString()}件</span>
+                                )}
+                                <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px] font-black w-fit border border-emerald-100">{margin}%</div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -918,12 +1008,16 @@ const DashboardView = ({
             )}
             {data.length === 0 ? (
               <tr>
-                <td colSpan={years.length + 2} className="px-8 py-16 text-center text-slate-300 italic">
+                <td colSpan={months.length + 2} className="px-8 py-16 text-center text-slate-300 italic">
                   該当するデータがありません
                 </td>
               </tr>
             ) : (
-              data.map((item, idx) => (
+              data.map((item, idx) => {
+                const productNameShort = item.productName
+                  ? truncateByDisplayWidth(item.productName, 15)
+                  : '';
+                return (
                 <tr
                   key={idx}
                   className={`group hover:bg-red-50/30 transition-all ${
@@ -958,6 +1052,15 @@ const DashboardView = ({
                         />
                       )}
                     </div>
+                    {isLeafLevel && item.productName && (
+                      <div
+                        className="text-xs text-slate-500 font-semibold mt-1 leading-snug"
+                        title={item.productName}
+                      >
+                        {productNameShort}
+                        {productNameShort !== item.productName ? '…' : ''}
+                      </div>
+                    )}
                     {item.reps && item.reps.length > 0 && (
                       <div className="text-[11px] text-slate-400 mt-0.5">
                         {item.reps.join(' / ')}
@@ -969,15 +1072,29 @@ const DashboardView = ({
                       </div>
                     )}
                   </td>
-                  {years.map((year, yIdx) => {
-                    const sales = item.sales[year] || 0;
-                    const profit = item.profit[year] || 0;
+                  {months.map((month, mIdx) => {
+                    // 「計」列の場合は月ごとの合計を計算
+                    let sales, profit, count, qty;
+                    if (month === '計') {
+                      sales = 0; profit = 0; count = 0; qty = 0;
+                      months.slice(0, -1).forEach(m => {
+                        sales += item.sales[m] || 0;
+                        profit += item.profit[m] || 0;
+                        count += item.count ? (item.count[m] || 0) : 0;
+                        qty += item.quantity ? (item.quantity[m] || 0) : 0;
+                      });
+                    } else {
+                      sales = item.sales[month] || 0;
+                      profit = item.profit[month] || 0;
+                      count = item.count ? (item.count[month] || 0) : 0;
+                      qty = item.quantity ? (item.quantity[month] || 0) : 0;
+                    }
                     const margin = calcMargin(profit, sales);
-                    const prevYear = years[yIdx - 1];
-                    const yoy = prevYear ? calcYoY(sales, item.sales[prevYear]) : null;
+                    const prevMonth = months[mIdx - 1];
+                    const yoy = prevMonth && month !== '計' ? calcYoY(sales, item.sales[prevMonth]) : null;
 
                     return (
-                      <td key={year} className="px-6 py-6 border-l border-slate-300 group-hover:bg-white/50">
+                      <td key={month} className="px-6 py-6 border-l border-slate-300 group-hover:bg-white/50">
                         <div className="space-y-3">
                           <div className="flex justify-between items-baseline">
                             <span className="text-xs font-black text-slate-600">売上</span>
@@ -1002,8 +1119,15 @@ const DashboardView = ({
                                 <div className="font-mono font-black text-emerald-600">
                                   {fmtAmt(profit)}
                                 </div>
-                                <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px] font-black mt-0.5 w-fit ml-auto border border-emerald-100">
-                                  {margin}%
+                                <div className="flex items-center justify-end gap-1 mt-0.5">
+                                  {isLeafLevel ? (
+                                    qty > 0 && <span className="text-xs font-black text-slate-800">{qty.toLocaleString()}台</span>
+                                  ) : (
+                                    count > 0 && <span className="text-xs font-black text-slate-800">{count.toLocaleString()}件</span>
+                                  )}
+                                  <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[11px] font-black w-fit border border-emerald-100">
+                                    {margin}%
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1013,7 +1137,8 @@ const DashboardView = ({
                     );
                   })}
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -1039,10 +1164,10 @@ const DashboardView = ({
                 formatter={(value) => fmtAmt(value)}
               />
               <Legend iconType="circle" wrapperStyle={{ paddingTop: '2rem' }} />
-              {years.length > 0 && (
+              {months.length > 1 && (
                 <>
-                  <Bar dataKey={`${years[years.length - 1]}年 売上`} fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={24} />
-                  <Bar dataKey={`${years[years.length - 1]}年 粗利`} fill="#10b981" radius={[6, 6, 0, 0]} barSize={24} />
+                  <Bar dataKey={`${months[months.length - 2]} 売上`} fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={24} />
+                  <Bar dataKey={`${months[months.length - 2]} 粗利`} fill="#10b981" radius={[6, 6, 0, 0]} barSize={24} />
                 </>
               )}
             </BarChart>
@@ -1055,7 +1180,7 @@ const DashboardView = ({
 };
 
 // ===== ピボットレポートビュー =====
-const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSort, onSortChange, onSavePdf, onSaveCsv, fmtAmt, amountUnit, showProfit, selectedLeaseCo }) => {
+const PivotView = ({ data, months, branches, pivotBranch, onBranchChange, pivotSort, onSortChange, onSavePdf, onSaveCsv, fmtAmt, amountUnit, showProfit, selectedLeaseCo }) => {
   const titleParts = [
     selectedLeaseCo !== 'ALL' ? selectedLeaseCo : null,
     pivotBranch !== 'ALL' ? pivotBranch : null,
@@ -1151,9 +1276,9 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
                   顧客名 {pivotSort === 'customer' && <ArrowUpDown size={12} />}
                 </button>
               </th>
-              {years.map(year => (
-                <th key={year} className="px-3 py-4 border-l border-slate-800 min-w-[160px]">
-                  {year}年度 実績
+              {months.map(month => (
+                <th key={month} className="px-3 py-4 border-l border-slate-800 min-w-[160px]">
+                  {month}
                 </th>
               ))}
             </tr>
@@ -1161,7 +1286,7 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
           <tbody className="divide-y divide-slate-300">
             {data.length === 0 ? (
               <tr>
-                <td colSpan={2 + years.length} className="px-8 py-16 text-center text-slate-300 italic">
+                <td colSpan={2 + months.length} className="px-8 py-16 text-center text-slate-300 italic">
                   該当するデータがありません
                 </td>
               </tr>
@@ -1177,15 +1302,26 @@ const PivotView = ({ data, years, branches, pivotBranch, onBranchChange, pivotSo
                       <span className="font-black text-slate-800 text-sm">{row.customer}</span>
                     </div>
                   </td>
-                  {years.map((year, yIdx) => {
-                    const sales = row.sales[year] || 0;
-                    const profit = row.profit[year] || 0;
+                  {months.map((month, mIdx) => {
+                    // 「計」列の場合は月ごとの合計を計算
+                    let sales, profit;
+                    if (month === '計') {
+                      sales = 0;
+                      profit = 0;
+                      months.slice(0, -1).forEach(m => {
+                        sales += row.sales[m] || 0;
+                        profit += row.profit[m] || 0;
+                      });
+                    } else {
+                      sales = row.sales[month] || 0;
+                      profit = row.profit[month] || 0;
+                    }
                     const margin = calcMargin(profit, sales);
-                    const prevYear = years[yIdx - 1];
-                    const yoy = prevYear ? calcYoY(sales, row.sales[prevYear]) : null;
+                    const prevMonth = months[mIdx - 1];
+                    const yoy = prevMonth && month !== '計' ? calcYoY(sales, row.sales[prevMonth]) : null;
 
                     return (
-                      <td key={year} className="px-3 py-3 border-l border-slate-300 bg-white/40">
+                      <td key={month} className="px-3 py-3 border-l border-slate-300 bg-white/40">
                         <div className="flex flex-col gap-0.5">
                           <div className="flex justify-between items-baseline">
                             <span className="text-[9px] font-black text-slate-400">売上</span>

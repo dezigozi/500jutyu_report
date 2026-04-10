@@ -12,8 +12,10 @@ process.on('uncaughtException', (err) => {
 });
 
 let mainWindow;
+const isDev = process.argv.includes('--dev');
 
 // ===== キャッシュ管理 =====
+const CACHE_VERSION = 6; // 商品名（V列）追加
 const CACHE_DIR = path.join(app.getPath('userData'), 'excel-cache');
 
 function ensureCacheDir() {
@@ -65,6 +67,10 @@ function loadCache(dirPath) {
     const json = zlib.gunzipSync(compressed).toString('utf8');
     const cache = JSON.parse(json);
 
+    if (cache.version !== CACHE_VERSION) {
+      console.log(`[Cache] バージョン不一致 (${cache.version} → ${CACHE_VERSION}) → キャッシュ無効`);
+      return null;
+    }
     const currentFingerprint = getFilesFingerprint(dirPath);
     if (cache.fingerprint !== currentFingerprint) {
       console.log('[Cache] フィンガープリント不一致 → キャッシュ無効');
@@ -97,11 +103,16 @@ function saveCache(dirPath, data) {
         profit: r.profit,
         fiscalYear: r.fiscalYear,
         month: r.month,
+        calendarYear: r.calendarYear,
+        orderSlipNo: r.orderSlipNo,
+        productCode: r.productCode,
+        productName: r.productName,
+        quantity: r.quantity,
       })),
       diagnostics: undefined,
     };
 
-    const json = JSON.stringify({ fingerprint, dirPath, data: slim });
+    const json = JSON.stringify({ version: CACHE_VERSION, fingerprint, dirPath, data: slim });
     console.log(`[Cache] 圧縮中... (JSON: ${(json.length / 1024 / 1024).toFixed(1)}MB)`);
     const compressed = zlib.gzipSync(json, { level: 6 });
     fs.writeFileSync(cachePath, compressed);
@@ -123,7 +134,6 @@ function createWindow() {
     title: '架装品 500受注レポート',
     show: false,
   });
-  const isDev = process.argv.includes('--dev');
   if (isDev) {
     mainWindow.loadURL('http://localhost:9000');
   } else {
@@ -171,12 +181,22 @@ const HEADER_PATTERNS = {
   quantity:     { patterns: ['受注数量', '数量'], prefer_last: false },
   deliveryDate: { patterns: ['登録日', '納品日', '納品', '納入日'], prefer_last: false },
   slipDate:     { patterns: ['売上伝票日', '伝票日', '売上日', '計上日'], prefer_last: false },
+  registrationMonth: { patterns: ['登録月'], prefer_last: false },
+  profitAmount: { patterns: ['粗利'], prefer_last: true },
+  orderSlipNo:  { patterns: ['受注伝票番号', '受注伝票', '伝票番号'], prefer_last: false },
+  productCode:  { patterns: ['品番'], prefer_last: false },
+  productName:  { patterns: ['商品名'], prefer_last: false },
+  quantity:     { patterns: ['受注数量', '受注数', '数量'], prefer_last: false },
 };
 
 // 強制オーバーライド列番号（診断データから確認済み）
-// AD(30)列=略称
+// AD(30)列=略称, AF(32)列=粗利
 const OVERRIDE_COLUMNS = {
   leaseCompany: 30, // AD列 - 略称
+  profitAmount: 32, // AF列 - 粗利
+  productCode:  21, // U列  - 品番
+  productName:  22, // V列  - 商品名
+  quantity:     23, // W列  - 受注数
 };
 
 function detectColumnsFromRow(row) {
@@ -302,8 +322,17 @@ async function readExcelStreaming(filePath) {
       worksheets: 'emit',
     });
 
+    let firstSheetDone = false;
+
     workbookReader.on('worksheet', (worksheetReader) => {
       sheetName = worksheetReader.name || 'Sheet';
+
+      // 2枚目以降のシートは行を読まずにスキップ
+      if (firstSheetDone) {
+        worksheetReader.on('row', () => {}); // 空ハンドラで消費
+        return;
+      }
+      firstSheetDone = true;
 
       worksheetReader.on('row', (row) => {
         rowCount++;
@@ -339,23 +368,41 @@ async function readExcelStreaming(filePath) {
         const ordererName  = colMap.ordererName  ? toStr(row.getCell(colMap.ordererName).value) : '';
         const customerName = colMap.customerName ? toStr(row.getCell(colMap.customerName).value) : '';
         const rep          = colMap.repLastName  ? toStr(row.getCell(colMap.repLastName).value) : '';
-        const sales        = colMap.salesAmount  ? toNumber(row.getCell(colMap.salesAmount).value) : 0;
-        const unitPrice    = colMap.unitPrice    ? toNumber(row.getCell(colMap.unitPrice).value) : 0;
-        const costPrice    = colMap.costPrice    ? toNumber(row.getCell(colMap.costPrice).value) : 0;
-        const quantity     = colMap.quantity     ? toNumber(row.getCell(colMap.quantity).value) : 1;
-        const profit       = (unitPrice - costPrice) * quantity;
+        const sales        = colMap.unitPrice    ? toNumber(row.getCell(colMap.unitPrice).value) : 0;
+        // AF列から粗利を直接読み込む
+        const profit       = colMap.profitAmount ? toNumber(row.getCell(colMap.profitAmount).value) : 0;
+        // C列から受注伝票番号を読み込む
+        const orderSlipNo  = colMap.orderSlipNo  ? toStr(row.getCell(colMap.orderSlipNo).value) : '';
+        // U列から品番、V列から商品名、W列から受注数を読み込む
+        const productCode  = colMap.productCode  ? toStr(row.getCell(colMap.productCode).value) : '';
+        const productName  = colMap.productName  ? toStr(row.getCell(colMap.productName).value) : '';
+        const quantity     = colMap.quantity     ? toNumber(row.getCell(colMap.quantity).value) : 0;
+
+        // 登録月を優先、ない場合は納品日から計算
+        let month = null;
+        if (colMap.registrationMonth) {
+          const regMonth = toNumber(row.getCell(colMap.registrationMonth).value);
+          month = regMonth > 0 && regMonth <= 12 ? Math.floor(regMonth) : null;
+        }
+        if (!month) {
+          const dateRaw = colMap.deliveryDate ? row.getCell(colMap.deliveryDate).value
+                        : (colMap.slipDate    ? row.getCell(colMap.slipDate).value : null);
+          month = getMonth(dateRaw);
+        }
 
         const dateRaw = colMap.deliveryDate ? row.getCell(colMap.deliveryDate).value
                       : (colMap.slipDate    ? row.getCell(colMap.slipDate).value : null);
+        const parsedDate = parseExcelDate(dateRaw);
         const fiscalYear = getFiscalYear(dateRaw);
-        const month = getMonth(dateRaw);
+        const calendarYear = parsedDate ? parsedDate.getFullYear() : null;
 
         // 空行スキップ
         if (!leaseCompany && !branch && !ordererName && !customerName && sales === 0) return;
 
         allRows.push({
           leaseCompany, branch, ordererName, customerName, rep,
-          sales, profit, fiscalYear, month,
+          sales, profit, fiscalYear, month, calendarYear, orderSlipNo,
+          productCode, productName, quantity,
         });
       });
     });
